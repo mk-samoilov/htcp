@@ -4,3 +4,8 @@ venv
 .idea
 
 __pycache__
+
+.claude
+.cursor
+
+*.log
