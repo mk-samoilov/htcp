@@ -4,10 +4,10 @@ import struct
 
 from typing import Optional
 
-from htcp.classes import Config, ClientInfo, Request
-from htcp.request_handler import RequestHandler
-from htcp.backend.proto import Package, create_error_package
-from htcp.backend.dh_encryption import DHEncryption, create_dh_init_message, parse_dh_message
+from .classes import Config, ClientInfo, Request
+from .request_handler import RequestHandler
+from .backend.proto import Package, create_error_package
+from .backend.dh_encryption import DHEncryption, create_dh_init_message, parse_dh_message
 
 
 class Server:
@@ -30,15 +30,6 @@ class Server:
         logger.setLevel(
             self.config.logging_level if self.config.enable_logging else logging.CRITICAL
         )
-
-        if self.config.enable_logging and not logger.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter(
-                fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                datefmt='%Y-%m-%d %H:%M:%S'
-            )
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
 
         return logger
 
@@ -64,7 +55,7 @@ class Server:
         async with self.connection_semaphore:
             self.active_connections += 1
             addr = writer.get_extra_info("peername")
-            self.logger.debug(f"Connection from {addr}")
+            self.logger.info(f"Connection from {addr[0]}:{addr[1]}")
 
             encryption: Optional[DHEncryption] = None
 
@@ -72,7 +63,7 @@ class Server:
                 if self.config.dh_encryption:
                     encryption = await self._perform_handshake(reader, writer)
                     if encryption is None:
-                        self.logger.warning(f"DH handshake failed for {addr}")
+                        self.logger.warning(f"DH handshake failed for {addr[0]}:{addr[1]}")
                         return
 
                 if self.config.connect_passkey:
@@ -88,13 +79,13 @@ class Server:
                         await self._process_request(package, writer, addr, encryption)
 
             except asyncio.CancelledError:
-                self.logger.debug(f"Connection cancelled: {addr}")
+                self.logger.debug(f"Connection cancelled: {addr[0]}:{addr[1]}")
 
             except ConnectionError as e:
-                self.logger.debug(f"Connection error from {addr}: {e}")
+                self.logger.debug(f"Connection error from {addr[0]}:{addr[1]}: {e}")
 
             except Exception as e:
-                self.logger.error(f"Error handling client {addr}: {e}", exc_info=True)
+                self.logger.error(f"Error handling client {addr[0]}:{addr[1]}: {e}", exc_info=True)
 
             finally:
                 try:
@@ -103,7 +94,7 @@ class Server:
                 except ExceptionGroup:
                     pass
                 self.active_connections -= 1
-                self.logger.debug(f"Connection closed: {addr}")
+                self.logger.info(f"Connection closed: {addr[0]}:{addr[1]}")
 
     async def _perform_handshake(
         self,
@@ -144,19 +135,19 @@ class Server:
             package = await self._read_package(reader, encryption)
 
             if package is None:
-                self.logger.warning(f"No auth package from {addr}")
+                self.logger.warning(f"No auth package from {addr[0]}:{addr[1]}")
                 return False
 
             if package.transaction != "_auth":
-                self.logger.warning(f"Expected _auth transaction from {addr}, got {package.transaction}")
+                self.logger.warning(f"Expected _auth transaction from {addr[0]}:{addr[1]} got {package.transaction}")
                 return False
 
             client_passkey = package.content.get("passkey")
             if client_passkey != self.config.connect_passkey:
-                self.logger.warning(f"Invalid passkey from {addr}")
+                self.logger.warning(f"Invalid passkey from {addr[0]}:{addr[1]}")
                 return False
 
-            self.logger.debug(f"Passkey validated for {addr}")
+            self.logger.debug(f"Passkey validated for {addr[0]}:{addr[1]}")
             return True
 
         except Exception as e:
@@ -246,7 +237,7 @@ class Server:
 
             await self._send_package(writer, response_pkg, encryption)
 
-            self.logger.debug(f"Processed {package.transaction} from {addr}")
+            self.logger.info(f"Processed {package.transaction} from {addr[0]}:{addr[1]}")
 
         except Exception as e:
             self.logger.error(f"Handler error for {package.transaction}: {e}", exc_info=True)

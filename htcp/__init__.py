@@ -1,12 +1,6 @@
-"""
-HTCP Server Package
-
-High TCP server library for asynchronous TCP communication.
-"""
-
-from htcp.server import Server
-from htcp.classes import Config, Request
-from htcp.request_handler import RequestHandler
-from htcp import utils
+from .server import Server
+from .classes import Config, Request
+from .request_handler import RequestHandler
+from . import utils
 
 __all__ = ['Server', 'Config', 'Request', 'RequestHandler', 'utils']
